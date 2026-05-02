@@ -1,0 +1,20 @@
+# Environment / secrets
+.env
+.env.*
+
+# If you ever add a local admin config with the service role key
+admin/admin-config.mjs
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Node (in case you ever add tooling)
+node_modules/

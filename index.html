@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app" id="app-root">
+  <div class="nav">
+    <div id="nav-back-wrap"></div>
+    <div class="nav-logo">♠ PokerLedger</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button type="button" id="btn-refresh" class="btn-refresh" style="display:none" onclick="refreshData()" title="Refresh">↻</button>
+      <button type="button" id="btn-sign-out" class="btn-ghost-mini" style="display:none" onclick="signOutClicked()">Logout</button>
+      <div class="nav-user">AK</div>
+    </div>
+  </div>
+
+  <!-- PAGE 1: Dashboard -->
+  <div class="page active" id="page-dashboard">
+    <div style="margin-bottom:16px;padding-top:2px">
+      <div style="font-family:var(--font-head);font-size:21px">Welcome back, <span style="color:var(--gold)" id="dash-welcome-name">friend</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">Lifetime performance</div>
+    </div>
+    <div class="graph-card">
+      <div class="graph-title">Net P&L</div>
+      <div class="graph-total" id="dash-total">$0</div>
+      <canvas id="pnl-chart" height="110"></canvas>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-val pos" id="dash-sessions">0</div><div class="stat-lbl">Sessions</div></div>
+      <div class="stat"><div class="stat-val" id="dash-tables">0</div><div class="stat-lbl">Tables</div></div>
+      <div class="stat"><div class="stat-val" id="dash-winrate">—</div><div class="stat-lbl">Win Rate</div></div>
+    </div>
+    <div class="sec-head"><div class="sec-title">Recent Results</div></div>
+    <div class="delta-list" id="dash-deltas"></div>
+    <div class="sec-head" style="margin-top:16px">
+      <div class="sec-title">My Tables</div>
+      <button class="btn-sm" onclick="nav('page-tables')">View All</button>
+    </div>
+    <div id="dash-tables-list"></div>
+  </div>
+
+  <!-- PAGE 2: Tables -->
+  <div class="page" id="page-tables">
+    <div class="sec-head" style="margin-top:2px">
+      <div class="sec-title">My Tables</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-sm" onclick="openModal('modal-join-table')">Join</button>
+        <button class="btn-sm" onclick="openModal('modal-create-table')">+ New</button>
+      </div>
+    </div>
+    <div id="tables-list"></div>
+  </div>
+
+  <!-- PAGE 3: Table Info -->
+  <div class="page" id="page-table-info">
+    <div style="margin-bottom:14px">
+      <div style="font-family:var(--font-head);font-size:21px;color:var(--gold)" id="ti-name"></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px" id="ti-sub"></div>
+    </div>
+    <div id="ti-code-section"></div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-val" id="ti-games-count">0</div><div class="stat-lbl">Games</div></div>
+      <div class="stat"><div class="stat-val" id="ti-pot-total">$0</div><div class="stat-lbl">Total Pot</div></div>
+      <div class="stat"><div class="stat-val" id="ti-mynet">$0</div><div class="stat-lbl">My Net</div></div>
+    </div>
+    <div id="ti-auth-new-game"></div>
+    <div class="sec-head"><div class="sec-title">Players</div></div>
+    <div id="ti-players-list"></div>
+    <div class="divider"></div>
+    <div class="sec-head">
+      <div class="sec-title">Games</div>
+      <button class="btn-sm" onclick="exportGamesCsv()">↓ CSV</button>
+    </div>
+    <div id="ti-games-list"></div>
+    <div class="divider"></div>
+    <div class="sec-head">
+      <div class="sec-title">Payments</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-sm" onclick="exportSettlementsCsv()">↓ CSV</button>
+        <button class="btn-sm" id="ti-add-pay-btn" onclick="openPaymentModal()">+ Record</button>
+      </div>
+    </div>
+    <div id="ti-payments-list"></div>
+  </div>
+
+  <!-- PAGE 4: Game -->
+  <div class="page" id="page-game">
+    <div style="margin-bottom:10px">
+      <div style="font-family:var(--font-head);font-size:17px" id="game-title"></div>
+      <div style="font-size:10px;color:var(--muted)" id="game-date"></div>
+    </div>
+    <div class="pot-display">
+      <div class="pot-row">
+        <div class="pot-block">
+          <div class="pot-lbl">Money In</div>
+          <div class="pot-num" id="game-money-in">$0</div>
+        </div>
+        <div class="pot-divider"></div>
+        <div class="pot-block">
+          <div class="pot-lbl">Chips in Play</div>
+          <div class="pot-num chips" id="game-chips">0</div>
+        </div>
+      </div>
+    </div>
+    <div id="game-settings-bar"></div>
+    <div class="sec-head">
+      <div class="sec-title">Players</div>
+    </div>
+    <div id="game-players-list"></div>
+    <div class="divider"></div>
+    <div class="sec-head"><div class="sec-title">Session activity</div></div>
+    <div id="game-activity-log" class="activity-feed"></div>
+  </div>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay" class="loading-overlay hidden">
+  <div class="loading-spinner"></div>
+</div>
+
+<!-- MODALS -->
+
+<!-- Auth modal -->
+<div class="modal-backdrop" id="modal-auth">
+  <div class="modal">
+    <div class="modal-title" id="auth-modal-title">Welcome</div>
+
+    <!-- Offline / local auth panel -->
+    <div id="auth-panel-offline" style="display:none">
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab-btn auth-tab-active" id="auth-tab-local-in" onclick="switchLocalAuth('sign-in')">Sign in</button>
+        <button type="button" class="auth-tab-btn" id="auth-tab-local-up" onclick="switchLocalAuth('sign-up')">Create account</button>
+      </div>
+
+      <!-- Sign in -->
+      <div id="auth-local-sign-in">
+        <input class="modal-input" type="text" placeholder="Username" id="local-username-si" autocomplete="username">
+        <input class="modal-input" type="password" placeholder="Password" id="local-password-si" autocomplete="current-password">
+        <button class="btn-primary" type="button" style="width:100%;margin-bottom:10px" onclick="submitLocalSignIn()">Sign In</button>
+      </div>
+
+      <!-- Sign up -->
+      <div id="auth-local-sign-up" style="display:none">
+        <input class="modal-input" type="text" placeholder="Display name" id="local-display-su" autocomplete="nickname">
+        <input class="modal-input" type="text" placeholder="Username (letters, numbers, _)" id="local-username-su" autocomplete="username">
+        <input class="modal-input" type="password" placeholder="Password (4+ chars)" id="local-password-su" autocomplete="new-password">
+        <button class="btn-primary" type="button" style="width:100%;margin-bottom:10px" onclick="submitLocalSignUp()">Create Account</button>
+      </div>
+
+      <div style="font-size:11px;color:var(--muted);line-height:1.4">No internet required — accounts and tables are saved to this device.</div>
+    </div>
+
+    <!-- Cloud / Supabase auth panel -->
+    <div id="auth-panel-cloud" style="display:none">
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab-btn auth-tab-active" id="auth-tab-sign-in" onclick="switchAuth('sign-in')">Sign in</button>
+        <button type="button" class="auth-tab-btn" id="auth-tab-sign-up" onclick="switchAuth('sign-up')">Create account</button>
+      </div>
+      <div id="auth-panel-sign-in">
+        <input class="modal-input" type="text" placeholder="Username" id="auth-username" autocomplete="username">
+        <input class="modal-input" type="password" placeholder="Password" id="auth-password" autocomplete="current-password">
+        <button class="btn-primary" type="button" style="width:100%;margin-bottom:10px" onclick="submitSignIn()">Sign In</button>
+      </div>
+      <div id="auth-panel-sign-up" style="display:none">
+        <input class="modal-input" type="text" placeholder="Display name" id="auth-display-name" autocomplete="nickname">
+        <input class="modal-input" type="text" placeholder="Username (letters, numbers, _)" id="auth-username-su" autocomplete="username">
+        <input class="modal-input" type="password" placeholder="Password (6+ chars)" id="auth-password-su" autocomplete="new-password">
+        <button class="btn-primary" type="button" style="width:100%;margin-bottom:10px" onclick="submitSignUp()">Create Account</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.35">
+        Configure <span style="color:var(--gold)">js/supabase-config.mjs</span>, run the SQL migrations, and disable email confirmation in Supabase Auth settings.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Error modal -->
+<div class="modal-backdrop z-modal-error" id="modal-error">
+  <div class="modal modal-error-card">
+    <div class="modal-title modal-error-title">Something went wrong</div>
+    <div id="modal-error-text" class="modal-error-body"></div>
+    <button type="button" class="btn-primary" style="width:100%;margin-top:10px" onclick="closeModal('modal-error')">OK</button>
+  </div>
+</div>
+
+<!-- Create table modal -->
+<div class="modal-backdrop" id="modal-create-table">
+  <div class="modal">
+    <div class="modal-title">Create Table</div>
+    <input class="modal-input" placeholder="Table name" id="new-table-name">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-create-table')">Cancel</button>
+      <button class="btn-primary" onclick="createTable()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Join table modal -->
+<div class="modal-backdrop" id="modal-join-table">
+  <div class="modal">
+    <div class="modal-title">Join a Table</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Enter the active join code shared by the table creator.</div>
+    <input class="modal-input" placeholder="Enter code (e.g. ABCD12)" id="join-code" style="text-transform:uppercase;letter-spacing:2px">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-join-table')">Cancel</button>
+      <button class="btn-primary" onclick="joinTable()">Join</button>
+    </div>
+  </div>
+</div>
+
+<!-- New game modal -->
+<div class="modal-backdrop" id="modal-new-game">
+  <div class="modal">
+    <div class="modal-title">New Game</div>
+    <input class="modal-input" placeholder="Session label" id="new-game-name">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-new-game')">Cancel</button>
+      <button class="btn-primary" onclick="createGame()">Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add buy-in modal -->
+<div class="modal-backdrop" id="modal-add-buyin">
+  <div class="modal">
+    <div class="modal-title">Add Buy-in</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px" id="buyin-label"></div>
+    <input class="modal-input" placeholder="Amount ($)" type="number" id="buyin-amount">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-add-buyin')">Cancel</button>
+      <button class="btn-primary" onclick="confirmBuyin()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clearout modal — input is chips, converted to money via chip multiplier -->
+<div class="modal-backdrop" id="modal-clearout">
+  <div class="modal">
+    <div class="modal-title">Record Clearout</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px" id="clearout-label"></div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px" id="clearout-mult-hint"></div>
+    <input class="modal-input" placeholder="Chips out" type="number" id="clearout-amount">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-clearout')">Cancel</button>
+      <button class="btn-primary" onclick="confirmClearout()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sponsorship modal -->
+<div class="modal-backdrop" id="modal-sponsorship">
+  <div class="modal">
+    <div class="modal-title">Add Sponsorship</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px" id="sponsor-label"></div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Sponsored by</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="sponsor-by-display" class="sponsor-pick-display">Tap to select sponsor →</div>
+        <button class="btn-sm" type="button" onclick="openSponsorPickerModal()" style="flex-shrink:0">Select</button>
+      </div>
+    </div>
+    <input class="modal-input" placeholder="Amount ($)" type="number" id="sponsor-amount">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-sponsorship')">Cancel</button>
+      <button class="btn-primary" onclick="confirmSponsorship()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic player picker modal (stacks above all other modals) -->
+<div class="modal-backdrop picker-modal" id="modal-player-picker">
+  <div class="modal">
+    <div class="modal-title">Select Player</div>
+    <input class="modal-input" placeholder="Search players..." id="player-picker-search" oninput="filterPlayerPicker()" autocomplete="off">
+    <div id="player-picker-list" style="max-height:220px;overflow-y:auto;margin-bottom:10px;border:1px solid var(--border);border-radius:10px"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-player-picker')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add payment modal -->
+<div class="modal-backdrop" id="modal-add-payment">
+  <div class="modal">
+    <div class="modal-title">Record Payment</div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">From</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="pay-from-display" class="sponsor-pick-display">Tap to select player →</div>
+        <button class="btn-sm" type="button" onclick="openPaymentPickerModal('from')" style="flex-shrink:0">Select</button>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">To</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="pay-to-display" class="sponsor-pick-display">Tap to select player →</div>
+        <button class="btn-sm" type="button" onclick="openPaymentPickerModal('to')" style="flex-shrink:0">Select</button>
+      </div>
+    </div>
+    <input class="modal-input" placeholder="Amount ($)" type="number" id="pay-amount">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-add-payment')">Cancel</button>
+      <button class="btn-primary" onclick="addPayment()">Record</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+  import { SUPABASE_URL, SUPABASE_ANON_KEY, isConfigured } from './js/supabase-config.mjs';
+
+  window.APP_SUPABASE_CONFIGURED = isConfigured();
+  window.sb = window.APP_SUPABASE_CONFIGURED ?
+    createClient(SUPABASE_URL.trim(), SUPABASE_ANON_KEY.trim(), {
+      auth: { persistSession: true, autoRefreshToken: true }
+    })
+  : null;
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="js/demo-seed.js"></script>
+<script src="js/config.js"></script>
+<script src="js/state.js"></script>
+<script src="js/db.js"></script>
+<script src="js/helpers.js"></script>
+<script src="js/render.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
+</body>
+</html>

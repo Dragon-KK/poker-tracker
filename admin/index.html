@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PokerLedger · Admin</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--surface3:#2d333b;
+  --border:#30363d;--text:#e6edf3;--muted:#8b949e;
+  --gold:#e3b341;--green:#3fb950;--red:#f85149;--blue:#58a6ff;
+  --radius:8px;
+}
+body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,sans-serif;min-height:100vh}
+
+/* Header */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;height:53px}
+.header-title{font-size:16px;font-weight:600;color:var(--gold);letter-spacing:.3px}
+.header-right{display:flex;align-items:center;gap:12px}
+.badge-on{color:var(--green);font-size:12px;font-weight:500}
+
+/* Buttons */
+button{cursor:pointer;font:inherit;border-radius:var(--radius);transition:opacity .15s}
+.btn-primary{background:var(--blue);border:none;color:#fff;padding:8px 20px;font-size:13px;font-weight:500}
+.btn-primary:hover{opacity:.85}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 12px;font-size:12px}
+.btn-ghost:hover{border-color:var(--text);color:var(--text)}
+.btn-danger{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);color:var(--red);padding:4px 10px;font-size:12px}
+.btn-danger:hover{background:rgba(248,81,73,.2)}
+.btn-settle{background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);color:var(--green);padding:4px 10px;font-size:12px}
+.btn-settle:hover{background:rgba(63,185,80,.2)}
+
+/* Connect panel */
+.conn-wrap{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 53px);padding:24px}
+.conn-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;width:100%;max-width:440px}
+.conn-title{font-size:20px;font-weight:600;margin-bottom:6px}
+.conn-sub{color:var(--muted);font-size:13px;margin-bottom:24px;line-height:1.5}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font:inherit;padding:9px 12px;outline:none}
+.field input:focus{border-color:var(--blue)}
+.conn-footer{display:flex;align-items:center;justify-content:space-between;margin-top:20px}
+.remember-row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);cursor:pointer}
+.conn-err{margin-top:12px;padding:10px 14px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);border-radius:var(--radius);color:var(--red);font-size:13px}
+
+/* Nav */
+.nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:stretch}
+.nav-tab{background:none;border:none;border-bottom:2px solid transparent;border-radius:0;color:var(--muted);padding:13px 16px;font-size:13px}
+.nav-tab.active{color:var(--text);border-bottom-color:var(--gold)}
+.nav-tab:hover:not(.active){color:var(--text)}
+.tab-n{font-size:10px;background:var(--surface3);border-radius:10px;padding:1px 6px;margin-left:5px;color:var(--muted)}
+.nav-spacer{flex:1}
+.nav-actions{display:flex;align-items:center;padding:8px 0}
+
+/* Content */
+.main{padding:24px}
+
+/* Table */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius)}
+table{width:100%;border-collapse:collapse}
+thead th{background:var(--surface2);padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:500;white-space:nowrap;border-bottom:1px solid var(--border)}
+tbody tr{border-top:1px solid var(--border)}
+tbody tr:hover{background:rgba(255,255,255,.02)}
+tbody td{padding:10px 14px;vertical-align:middle}
+.mono{font-family:ui-monospace,monospace;font-size:12px}
+.dim{color:var(--muted);font-size:12px}
+.td-act{white-space:nowrap;display:flex;gap:6px}
+.tag-settled{color:var(--green);font-size:12px}
+.tag-pending{color:var(--gold);font-size:12px}
+
+/* States */
+.state-msg{padding:40px;text-align:center;color:var(--muted);font-size:13px}
+.err-box{padding:14px 18px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:var(--radius);color:var(--red);font-size:13px;margin-bottom:16px}
+
+/* Confirm modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100;padding:24px}
+.confirm-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:26px;width:100%;max-width:400px}
+.confirm-h{font-size:16px;font-weight:600;margin-bottom:8px}
+.confirm-body{color:var(--muted);font-size:13px;margin-bottom:22px;line-height:1.55}
+.confirm-acts{display:flex;gap:10px;justify-content:flex-end}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 18px;font-size:13px;z-index:200;animation:tIn .18s ease;pointer-events:none}
+.toast.ok{border-color:rgba(63,185,80,.4);color:var(--green)}
+.toast.err{border-color:rgba(248,81,73,.4);color:var(--red)}
+@keyframes tIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">♠ PokerLedger Admin</div>
+  <div class="header-right">
+    <span id="conn-badge"></span>
+    <button class="btn-ghost" id="btn-disc" style="display:none" onclick="disconnect()">Disconnect</button>
+  </div>
+</div>
+
+<!-- Connect panel -->
+<div class="conn-wrap" id="conn-panel">
+  <div class="conn-card">
+    <div class="conn-title">Admin Panel</div>
+    <div class="conn-sub">Connect with your Supabase <strong>service role key</strong> to manage users, tables, games and payments. Keep this page local — never deploy it publicly.</div>
+    <div class="field">
+      <label>Supabase URL</label>
+      <input id="inp-url" type="url" placeholder="https://xxxx.supabase.co" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>Service Role Key</label>
+      <input id="inp-key" type="password" placeholder="eyJ…" spellcheck="false">
+    </div>
+    <div id="conn-err" style="display:none" class="conn-err"></div>
+    <div class="conn-footer">
+      <label class="remember-row">
+        <input type="checkbox" id="inp-remember"> Remember in this browser
+      </label>
+      <button class="btn-primary" onclick="connect()">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="main-app" style="display:none">
+  <div class="nav">
+    <button class="nav-tab active" id="ntab-users"    onclick="loadTab('users')">Users <span class="tab-n" id="n-users">—</span></button>
+    <button class="nav-tab"        id="ntab-tables"   onclick="loadTab('tables')">Tables <span class="tab-n" id="n-tables">—</span></button>
+    <button class="nav-tab"        id="ntab-games"    onclick="loadTab('games')">Games <span class="tab-n" id="n-games">—</span></button>
+    <button class="nav-tab"        id="ntab-payments" onclick="loadTab('payments')">Payments <span class="tab-n" id="n-payments">—</span></button>
+    <div class="nav-spacer"></div>
+    <div class="nav-actions">
+      <button class="btn-ghost" onclick="reload()">↻ Refresh</button>
+    </div>
+  </div>
+  <div class="main" id="content"></div>
+</div>
+
+<!-- Confirm modal -->
+<div class="overlay" id="overlay" style="display:none">
+  <div class="confirm-card">
+    <div class="confirm-h">Confirm deletion</div>
+    <div class="confirm-body" id="confirm-msg"></div>
+    <div class="confirm-acts">
+      <button class="btn-ghost" onclick="resolve(false)">Cancel</button>
+      <button class="btn-danger" onclick="resolve(true)">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+let sb = null;
+let activeTab = 'users';
+let _resolve = null;
+
+// ── Connection ────────────────────────────────────────────────────────────────
+
+window.connect = async function () {
+  const url = document.getElementById('inp-url').value.trim();
+  const key = document.getElementById('inp-key').value.trim();
+  const errEl = document.getElementById('conn-err');
+  errEl.style.display = 'none';
+  if (!url || !key) { connErr('Enter both the Supabase URL and service role key.'); return; }
+  try {
+    sb = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+    const { error } = await sb.from('profiles').select('id').limit(1);
+    if (error) throw error;
+    if (document.getElementById('inp-remember').checked) {
+      localStorage.setItem('adm_url', url);
+      localStorage.setItem('adm_key', key);
+    }
+    document.getElementById('conn-panel').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    document.getElementById('conn-badge').innerHTML = '<span class="badge-on">● Connected</span>';
+    document.getElementById('btn-disc').style.display = '';
+    loadTab('users');
+  } catch (e) { connErr(e.message || String(e)); }
+};
+
+window.disconnect = function () {
+  sb = null;
+  document.getElementById('conn-panel').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('conn-badge').innerHTML = '';
+  document.getElementById('btn-disc').style.display = 'none';
+};
+
+function connErr(msg) {
+  const el = document.getElementById('conn-err');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// ── Tab navigation ────────────────────────────────────────────────────────────
+
+window.loadTab = function (tab) {
+  activeTab = tab;
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('ntab-' + tab).classList.add('active');
+  ({ users: loadUsers, tables: loadTables, games: loadGames, payments: loadPayments })[tab]();
+};
+
+window.reload = function () { loadTab(activeTab); };
+
+function html(s) { document.getElementById('content').innerHTML = s; }
+function setN(tab, n) { document.getElementById('n-' + tab).textContent = n; }
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+async function loadUsers() {
+  html('<div class="state-msg">Loading…</div>');
+  try {
+    const [{ data: auth, error: e1 }, { data: profs, error: e2 }] = await Promise.all([
+      sb.auth.admin.listUsers({ perPage: 1000 }),
+      sb.from('profiles').select('id,display_name')
+    ]);
+    if (e1) throw e1; if (e2) throw e2;
+    const pm = {}; (profs || []).forEach(p => { pm[p.id] = p.display_name; });
+    const users = (auth?.users || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    setN('users', users.length);
+    if (!users.length) { html('<div class="state-msg">No users registered.</div>'); return; }
+    html(`<div class="tbl-wrap"><table>
+      <thead><tr><th>Display name</th><th>Email</th><th>User ID</th><th>Signed up</th><th></th></tr></thead>
+      <tbody>${users.map(u => `<tr>
+        <td>${x(pm[u.id] || '—')}</td>
+        <td class="mono">${x(u.email || '—')}</td>
+        <td class="mono dim">${u.id}</td>
+        <td class="dim">${u.created_at.slice(0,10)}</td>
+        <td><div class="td-act">
+          <button class="btn-danger" data-act="del-user" data-id="${u.id}" data-lbl="${x(pm[u.id] || u.email || u.id)}">Delete</button>
+        </div></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`);
+  } catch (e) { html(`<div class="err-box">${x(e.message || String(e))}</div>`); }
+}
+
+async function delUser(id, lbl) {
+  if (!await ask(`Delete user "${lbl}" and all their profile data? Their tables and games will remain.`)) return;
+  const { error } = await sb.auth.admin.deleteUser(id);
+  if (error) { toast(error.message, 'err'); return; }
+  toast('User deleted'); loadUsers();
+}
+
+// ── Tables ────────────────────────────────────────────────────────────────────
+
+async function loadTables() {
+  html('<div class="state-msg">Loading…</div>');
+  try {
+    const [{ data: tables, error: e1 }, { data: members, error: e2 }, { data: games, error: e3 }, { data: profs, error: e4 }] = await Promise.all([
+      sb.from('poker_tables').select('*').order('created_at', { ascending: false }),
+      sb.from('table_members').select('table_id,is_auth'),
+      sb.from('games').select('id,table_id'),
+      sb.from('profiles').select('id,display_name')
+    ]);
+    if (e1) throw e1;
+    const pm = {}; (profs || []).forEach(p => { pm[p.id] = p.display_name; });
+    setN('tables', (tables || []).length);
+    if (!tables?.length) { html('<div class="state-msg">No tables found.</div>'); return; }
+    html(`<div class="tbl-wrap"><table>
+      <thead><tr><th>Name</th><th>Creator</th><th>Members</th><th>Auth members</th><th>Games</th><th>Join code</th><th>Created</th><th></th></tr></thead>
+      <tbody>${tables.map(t => {
+        const tMem = (members || []).filter(m => String(m.table_id) === String(t.id));
+        return `<tr>
+          <td>${x(t.name)}</td>
+          <td>${x(pm[t.created_by] || '—')}</td>
+          <td>${tMem.length}</td>
+          <td>${tMem.filter(m => m.is_auth).length}</td>
+          <td>${(games || []).filter(g => String(g.table_id) === String(t.id)).length}</td>
+          <td class="mono">${t.code_active ? x(t.join_code) : '<span class="dim">inactive</span>'}</td>
+          <td class="dim">${t.created_at.slice(0,10)}</td>
+          <td><div class="td-act">
+            <button class="btn-danger" data-act="del-table" data-id="${t.id}" data-lbl="${x(t.name)}">Delete</button>
+          </div></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`);
+  } catch (e) { html(`<div class="err-box">${x(e.message || String(e))}</div>`); }
+}
+
+async function delTable(id, lbl) {
+  if (!await ask(`Delete table "${lbl}"? This will permanently delete all its games, buy-ins, clearouts, payments and members.`)) return;
+  const { error } = await sb.from('poker_tables').delete().eq('id', id);
+  if (error) { toast(error.message, 'err'); return; }
+  toast('Table deleted'); loadTables();
+}
+
+// ── Games ─────────────────────────────────────────────────────────────────────
+
+async function loadGames() {
+  html('<div class="state-msg">Loading…</div>');
+  try {
+    const [{ data: games, error: e1 }, { data: tables, error: e2 }, { data: gps, error: e3 }, { data: bis, error: e4 }, { data: cos, error: e5 }, { data: profs, error: e6 }] = await Promise.all([
+      sb.from('games').select('*').order('created_at', { ascending: false }),
+      sb.from('poker_tables').select('id,name'),
+      sb.from('game_players').select('game_id,user_id'),
+      sb.from('buy_ins').select('game_id,user_id,amount'),
+      sb.from('clearouts').select('game_id,user_id,amount'),
+      sb.from('profiles').select('id,display_name')
+    ]);
+    if (e1) throw e1;
+    const tm = {}; (tables || []).forEach(t => { tm[t.id] = t.name; });
+    const pm = {}; (profs || []).forEach(p => { pm[p.id] = p.display_name; });
+    setN('games', (games || []).length);
+    if (!games?.length) { html('<div class="state-msg">No games found.</div>'); return; }
+    html(`<div class="tbl-wrap"><table>
+      <thead><tr><th>Table</th><th>Game</th><th>Date</th><th>Players</th><th>Total in</th><th>Total out</th><th>Buy-in</th><th>Chip ×</th><th>Created</th><th></th></tr></thead>
+      <tbody>${games.map(g => {
+        const gid = String(g.id);
+        const players = (gps || []).filter(r => String(r.game_id) === gid).map(r => pm[r.user_id] || '?').join(', ');
+        const totalIn = (bis || []).filter(r => String(r.game_id) === gid).reduce((s, r) => s + Number(r.amount), 0);
+        const totalOut = (cos || []).filter(r => String(r.game_id) === gid).reduce((s, r) => s + Number(r.amount), 0);
+        const live = totalIn > totalOut;
+        return `<tr>
+          <td>${x(tm[g.table_id] || '—')}</td>
+          <td>${x(g.name)}${live ? ' <span class="tag-pending" style="font-size:10px">live</span>' : ''}</td>
+          <td class="dim">${g.session_date || '—'}</td>
+          <td class="dim" style="font-size:12px;max-width:200px">${x(players || '—')}</td>
+          <td>$${totalIn.toFixed(0)}</td>
+          <td>$${totalOut.toFixed(0)}</td>
+          <td class="dim">$${g.default_buyin || 0}</td>
+          <td class="dim">${g.chip_mult || 1}×</td>
+          <td class="dim">${g.created_at.slice(0,10)}</td>
+          <td><div class="td-act">
+            <button class="btn-danger" data-act="del-game" data-id="${g.id}" data-lbl="${x(g.name)}">Delete</button>
+          </div></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`);
+  } catch (e) { html(`<div class="err-box">${x(e.message || String(e))}</div>`); }
+}
+
+async function delGame(id, lbl) {
+  if (!await ask(`Delete game "${lbl}"? This will permanently delete all its buy-ins, clearouts, sponsorships and activity.`)) return;
+  const { error } = await sb.from('games').delete().eq('id', id);
+  if (error) { toast(error.message, 'err'); return; }
+  toast('Game deleted'); loadGames();
+}
+
+// ── Payments ──────────────────────────────────────────────────────────────────
+
+async function loadPayments() {
+  html('<div class="state-msg">Loading…</div>');
+  try {
+    const [{ data: pays, error: e1 }, { data: tables, error: e2 }, { data: profs, error: e3 }] = await Promise.all([
+      sb.from('payments').select('*').order('created_at', { ascending: false }),
+      sb.from('poker_tables').select('id,name'),
+      sb.from('profiles').select('id,display_name')
+    ]);
+    if (e1) throw e1;
+    const tm = {}; (tables || []).forEach(t => { tm[t.id] = t.name; });
+    const pm = {}; (profs || []).forEach(p => { pm[p.id] = p.display_name; });
+    setN('payments', (pays || []).length);
+    if (!pays?.length) { html('<div class="state-msg">No payments found.</div>'); return; }
+    html(`<div class="tbl-wrap"><table>
+      <thead><tr><th>Table</th><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr></thead>
+      <tbody>${pays.map(p => {
+        const from = pm[p.from_user_id] || '—';
+        const to   = pm[p.to_user_id]   || '—';
+        const done = p.status === 'done';
+        return `<tr>
+          <td>${x(tm[p.table_id] || '—')}</td>
+          <td>${x(from)}</td>
+          <td>${x(to)}</td>
+          <td>$${Number(p.amount).toFixed(0)}</td>
+          <td><span class="${done ? 'tag-settled' : 'tag-pending'}">${done ? 'Settled' : 'Pending'}</span></td>
+          <td class="dim">${p.created_at.slice(0,10)}</td>
+          <td><div class="td-act">
+            ${!done ? `<button class="btn-settle" data-act="settle-pay" data-id="${p.id}">Settle</button>` : ''}
+            <button class="btn-danger" data-act="del-pay" data-id="${p.id}" data-lbl="$${Number(p.amount).toFixed(0)} (${x(from)} → ${x(to)})">Delete</button>
+          </div></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>`);
+  } catch (e) { html(`<div class="err-box">${x(e.message || String(e))}</div>`); }
+}
+
+async function delPayment(id, lbl) {
+  if (!await ask(`Delete payment ${lbl}?`)) return;
+  const { error } = await sb.from('payments').delete().eq('id', id);
+  if (error) { toast(error.message, 'err'); return; }
+  toast('Payment deleted'); loadPayments();
+}
+
+async function settlePayment(id) {
+  const { error } = await sb.from('payments').update({ status: 'done' }).eq('id', id);
+  if (error) { toast(error.message, 'err'); return; }
+  toast('Marked as settled'); loadPayments();
+}
+
+// ── Event delegation ──────────────────────────────────────────────────────────
+
+document.getElementById('content').addEventListener('click', e => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const { act, id, lbl } = btn.dataset;
+  if (act === 'del-user')   delUser(id, lbl);
+  if (act === 'del-table')  delTable(id, lbl);
+  if (act === 'del-game')   delGame(id, lbl);
+  if (act === 'del-pay')    delPayment(id, lbl);
+  if (act === 'settle-pay') settlePayment(id);
+});
+
+// ── Confirm modal ─────────────────────────────────────────────────────────────
+
+function ask(msg) {
+  return new Promise(res => {
+    _resolve = res;
+    document.getElementById('confirm-msg').textContent = msg;
+    document.getElementById('overlay').style.display = 'flex';
+  });
+}
+
+window.resolve = function (val) {
+  document.getElementById('overlay').style.display = 'none';
+  if (_resolve) { _resolve(val); _resolve = null; }
+};
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function toast(msg, type = 'ok') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function x(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Auto-fill saved credentials ───────────────────────────────────────────────
+
+const su = localStorage.getItem('adm_url');
+const sk = localStorage.getItem('adm_key');
+if (su && sk) {
+  document.getElementById('inp-url').value = su;
+  document.getElementById('inp-key').value = sk;
+  document.getElementById('inp-remember').checked = true;
+}
+</script>
+</body>
+</html>
