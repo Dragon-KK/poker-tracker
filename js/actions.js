@@ -603,14 +603,25 @@ function undoLastGameAction() {
         const gid = g.id;
         const uid = entry.playerUserId;
 
+        // Helper: delete by id and verify a row was actually removed (catches
+        // silent RLS denials, where Postgres returns 0 rows + no error).
+        const deleteOrFail = async (table, id) => {
+          const { data, error } = await sb.from(table).delete().eq('id', id).select('id');
+          if (error) return error.message;
+          if (!data || data.length === 0) {
+            return `Could not delete from ${table} — likely missing DELETE policy. Apply migration 0004_undo_delete_policies.sql.`;
+          }
+          return null;
+        };
+
         // Sponsorship: remove the sponsorship row first (FK dependency), then the buyin
         if (entry.type === 'sponsorship') {
           const { data: sp } = await sb.from('sponsorships')
             .select('id').eq('game_id', gid).eq('sponsored_user_id', uid)
             .order('logged_at', { ascending: false }).limit(1).maybeSingle();
           if (sp) {
-            const { error } = await sb.from('sponsorships').delete().eq('id', sp.id);
-            if (error) { showError(error.message); stack.push(entry); return; }
+            const err = await deleteOrFail('sponsorships', sp.id);
+            if (err) { showError(err); stack.push(entry); return; }
           }
         }
 
@@ -619,8 +630,8 @@ function undoLastGameAction() {
             .select('id').eq('game_id', gid).eq('user_id', uid)
             .order('logged_at', { ascending: false }).limit(1).maybeSingle();
           if (bi) {
-            const { error } = await sb.from('buy_ins').delete().eq('id', bi.id);
-            if (error) { showError(error.message); stack.push(entry); return; }
+            const err = await deleteOrFail('buy_ins', bi.id);
+            if (err) { showError(err); stack.push(entry); return; }
           }
         }
 
@@ -629,12 +640,14 @@ function undoLastGameAction() {
             .select('id').eq('game_id', gid).eq('user_id', uid)
             .order('logged_at', { ascending: false }).limit(1).maybeSingle();
           if (co) {
-            const { error } = await sb.from('clearouts').delete().eq('id', co.id);
-            if (error) { showError(error.message); stack.push(entry); return; }
+            const err = await deleteOrFail('clearouts', co.id);
+            if (err) { showError(err); stack.push(entry); return; }
           }
         }
 
-        // Remove the matching activity entry for this user
+        // Remove the matching activity entry for this user (best-effort; don't
+        // block undo if RLS hasn't been updated yet — the data tables are what
+        // actually drive PnL).
         const { data: act } = await sb.from('game_activity')
           .select('id').eq('game_id', gid).eq('actor_user_id', ME_UID)
           .order('created_at', { ascending: false }).limit(1).maybeSingle();
