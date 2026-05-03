@@ -206,3 +206,10 @@ body:not(.app-authenticated) #app-root{
 @keyframes spin{to{transform:rotate(360deg)}}
 .btn-refresh{background:none;border:1px solid var(--border);color:var(--muted);font-family:var(--font-mono);font-size:14px;width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;line-height:1}
 .btn-refresh:hover{border-color:var(--gold);color:var(--gold)}
+
+
+/* UNDO BAR */
+.undo-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;margin-bottom:10px;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.18);border-radius:7px}
+.undo-lbl{font-size:10px;color:var(--muted);font-family:var(--font-mono);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.undo-btn{flex-shrink:0;background:none;border:1px solid rgba(224,85,85,0.4);color:#e05555;font-family:var(--font-mono);font-size:11px;padding:4px 12px;border-radius:5px;cursor:pointer;transition:all 0.15s}
+.undo-btn:hover{background:rgba(224,85,85,0.1);border-color:#e05555}

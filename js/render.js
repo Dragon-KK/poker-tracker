@@ -31,7 +31,12 @@ function nav(pageId, tableId, gameId) {
   if (pageId === 'page-dashboard') renderDashboard();
   if (pageId === 'page-tables') renderTables();
   if (pageId === 'page-table-info') renderTableInfo();
-  if (pageId === 'page-game') renderGame();
+  if (pageId === 'page-game') {
+    renderGame();
+    if (nextGame) subscribeToGameChanges(nextGame.id);
+  } else {
+    unsubscribeFromGameChanges();
+  }
   saveNavState();
 }
 
@@ -356,6 +361,19 @@ function renderGame() {
     })
     .join('');
 
+
+  const undoEl = document.getElementById('game-undo-bar');
+  if (undoEl) {
+    const top = peekUndo(g.id);
+    if (canEdit && top) {
+      undoEl.innerHTML = `<div class="undo-bar">
+        <div class="undo-lbl">${escapeHtml(top.label)}</div>
+        <button class="undo-btn" onclick="undoLastGameAction()">Undo</button>
+      </div>`;
+    } else {
+      undoEl.innerHTML = '';
+    }
+  }
 
   updateGamePot();
   renderActivityLog();

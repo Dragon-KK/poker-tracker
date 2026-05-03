@@ -142,12 +142,17 @@ function allDeltas() {
   return d.sort((a, b) => b.date.localeCompare(a.date));
 }
 
+function fmtAmount(n) {
+  const abs = Math.round(Math.abs(n) * 100) / 100;
+  return abs % 1 === 0 ? abs.toFixed(0) : abs.toFixed(2);
+}
+
 function fmt(n) {
-  return (n >= 0 ? '+' : '-') + `$${Math.abs(n).toFixed(0)}`;
+  return (n >= 0 ? '+' : '-') + `$${fmtAmount(n)}`;
 }
 
 function fmtAbs(n) {
-  return `$${Math.abs(n).toFixed(0)}`;
+  return `$${fmtAmount(n)}`;
 }
 
 function nowTs() {
