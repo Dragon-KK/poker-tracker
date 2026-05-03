@@ -1,3 +1,18 @@
+// ── Undo stack ────────────────────────────────────────────────────────────────
+// Keyed by gameId → array of undo entries (LIFO). Lives only for the browser
+// session; survives hydrateFromSupabase re-builds since it's not part of state.
+const _undoStack = {};
+
+function _gameUndoStack(gameId) {
+  if (!_undoStack[String(gameId)]) _undoStack[String(gameId)] = [];
+  return _undoStack[String(gameId)];
+}
+function _pushUndo(gameId, entry) { _gameUndoStack(gameId).push(entry); }
+function peekUndo(gameId) {
+  const s = _gameUndoStack(gameId);
+  return s.length ? s[s.length - 1] : null;
+}
+
 async function refreshData() {
   if (APP_SUPABASE_CONFIGURED && window.sb) {
     await hydrateFromSupabase({ keepSelection: true, tableId: state.table?.id, gameId: state.game?.id });
@@ -78,13 +93,14 @@ function confirmBuyin() {
     const player = state.game.players[state.modalBuyin];
 
     if (APP_SUPABASE_CONFIGURED && window.sb) {
-      const { error: e1 } = await sb.from('buy_ins').insert({
+      const { data: buyinRow, error: e1 } = await sb.from('buy_ins').insert({
         game_id: state.game.id,
         user_id: player.userId,
         amount: amt
-      });
+      }).select('id').single();
       if (e1) { showError(e1.message); return; }
-      await insertActivityRemote(state.game.id, 'Buy-in', `${player.name} · ${fmtAbs(amt)}`);
+      const actId = await insertActivityRemote(state.game.id, 'Buy-in', `${player.name} · ${fmtAbs(amt)}`);
+      _pushUndo(state.game.id, { type: 'buyin', label: `Buy-in · ${player.name} · ${fmtAbs(amt)}`, buyinId: buyinRow?.id, activityId: actId });
       await hydrateFromSupabase({ keepSelection: true, tableId: state.table.id, gameId: state.game.id });
       updateGamePot();
       await persistGamePeakRemote(state.game);
@@ -93,8 +109,10 @@ function confirmBuyin() {
       return;
     }
 
+    const gameId = state.game.id;
     player.buyins.push({ amt, ts: nowTs() });
     logGameActivity(state.game, 'Buy-in', `${player.name} · ${fmtAbs(amt)}`);
+    _pushUndo(gameId, { type: 'buyin', label: `Buy-in · ${player.name} · ${fmtAbs(amt)}`, playerUserId: player.userId });
     persistDemoTables();
     closeModal('modal-add-buyin');
     renderGame();
@@ -139,13 +157,14 @@ function confirmClearout() {
     const detail = `${player.name} · ${Math.round(chips)} chips → ${fmtAbs(amt)}`;
 
     if (APP_SUPABASE_CONFIGURED && window.sb) {
-      const { error } = await sb.from('clearouts').insert({
+      const { data: clearoutRow, error } = await sb.from('clearouts').insert({
         game_id: g.id,
         user_id: player.userId,
         amount: amt
-      });
+      }).select('id').single();
       if (error) { showError(error.message); return; }
-      await insertActivityRemote(g.id, 'Clearout', detail);
+      const actId = await insertActivityRemote(g.id, 'Clearout', detail);
+      _pushUndo(g.id, { type: 'clearout', label: `Clearout · ${detail}`, clearoutId: clearoutRow?.id, activityId: actId });
       await hydrateFromSupabase({ keepSelection: true, tableId: state.table.id, gameId: g.id });
       updateGamePot();
       closeModal('modal-clearout');
@@ -153,8 +172,10 @@ function confirmClearout() {
       return;
     }
 
+    const gameId = g.id;
     player.clearouts.push({ amt, ts: nowTs() });
     logGameActivity(g, 'Clearout', detail);
+    _pushUndo(gameId, { type: 'clearout', label: `Clearout · ${detail}`, playerUserId: player.userId });
     persistDemoTables();
     closeModal('modal-clearout');
     renderGame();
@@ -202,23 +223,24 @@ function confirmSponsorship() {
       const sponsor_user_id = isNameRef ? null : sponsorUserId;
       const sponsor_name = isNameRef ? by : null;
 
-      const { error: e1 } = await sb.from('buy_ins').insert({
+      const { data: buyinRow, error: e1 } = await sb.from('buy_ins').insert({
         game_id: state.game.id,
         user_id: sponsored.userId,
         amount: amt
-      });
+      }).select('id').single();
       if (e1) { showError(e1.message); return; }
 
-      const { error: e2 } = await sb.from('sponsorships').insert({
+      const { data: sponsorRow, error: e2 } = await sb.from('sponsorships').insert({
         game_id: state.game.id,
         sponsored_user_id: sponsored.userId,
         sponsor_user_id,
         sponsor_name,
         amount: amt
-      });
+      }).select('id').single();
       if (e2) { showError(e2.message); return; }
 
-      await insertActivityRemote(state.game.id, 'Sponsorship', `${sponsored.name} · ${fmtAbs(amt)} via ${by}`);
+      const actId = await insertActivityRemote(state.game.id, 'Sponsorship', `${sponsored.name} · ${fmtAbs(amt)} via ${by}`);
+      _pushUndo(state.game.id, { type: 'sponsorship', label: `Sponsorship · ${sponsored.name} · ${fmtAbs(amt)} via ${by}`, buyinId: buyinRow?.id, sponsorshipId: sponsorRow?.id, activityId: actId });
       await hydrateFromSupabase({ keepSelection: true, tableId: state.table.id, gameId: state.game.id });
       updateGamePot();
       await persistGamePeakRemote(state.game);
@@ -229,9 +251,11 @@ function confirmSponsorship() {
     }
 
     const ts = nowTs();
+    const gameId = state.game.id;
     sponsored.sponsorships.push({ by, amt, ts });
     sponsored.buyins.push({ amt, ts });
     logGameActivity(state.game, 'Sponsorship', `${sponsored.name} · ${fmtAbs(amt)} via ${by}`);
+    _pushUndo(gameId, { type: 'sponsorship', label: `Sponsorship · ${sponsored.name} · ${fmtAbs(amt)} via ${by}`, playerUserId: sponsored.userId });
     state._sponsorSelected = null;
     persistDemoTables();
     closeModal('modal-sponsorship');
@@ -560,6 +584,61 @@ function demotePlayer(targetUserRef) {
     if (error) { showError(error.message); return; }
     await hydrateFromSupabase({ keepSelection: true, tableId: t.id });
     renderTableInfo();
+  })();
+}
+
+// ── Undo last game action ─────────────────────────────────────────────────────
+
+function undoLastGameAction() {
+  (async () => {
+    const g = state.game;
+    if (!g) return;
+    const stack = _gameUndoStack(g.id);
+    const entry = stack.pop();
+    if (!entry) return;
+
+    if (APP_SUPABASE_CONFIGURED && window.sb) {
+      showLoading();
+      try {
+        if (entry.sponsorshipId) {
+          const { error } = await sb.from('sponsorships').delete().eq('id', entry.sponsorshipId);
+          if (error) { showError(error.message); stack.push(entry); return; }
+        }
+        if (entry.buyinId) {
+          const { error } = await sb.from('buy_ins').delete().eq('id', entry.buyinId);
+          if (error) { showError(error.message); stack.push(entry); return; }
+        }
+        if (entry.clearoutId) {
+          const { error } = await sb.from('clearouts').delete().eq('id', entry.clearoutId);
+          if (error) { showError(error.message); stack.push(entry); return; }
+        }
+        if (entry.activityId) {
+          await sb.from('game_activity').delete().eq('id', entry.activityId);
+        }
+      } finally {
+        hideLoading();
+      }
+      await hydrateFromSupabase({ keepSelection: true, tableId: state.table.id, gameId: g.id });
+      if (state.game) await persistGamePeakRemote(state.game);
+      renderGame();
+      return;
+    }
+
+    // Local mode
+    const player = g.players.find(p => p.userId === entry.playerUserId);
+    if (player) {
+      if (entry.type === 'buyin') {
+        player.buyins.pop();
+      } else if (entry.type === 'clearout') {
+        player.clearouts.pop();
+      } else if (entry.type === 'sponsorship') {
+        player.sponsorships.pop();
+        player.buyins.pop();
+      }
+    }
+    if (g.activity && g.activity.length) g.activity.shift();
+    persistDemoTables();
+    renderGame();
   })();
 }
 

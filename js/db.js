@@ -251,13 +251,49 @@ async function persistGamePeakRemote(g) {
   await sb.from('games').update({ peak_chips: g.peakChips }).eq('id', g.id);
 }
 
+// ── Supabase Realtime ─────────────────────────────────────────────────────────
+
+let _realtimeChannel = null;
+let _realtimeDebounce = null;
+
+function subscribeToGameChanges(gameId) {
+  if (!APP_SUPABASE_CONFIGURED || !window.sb) return;
+  unsubscribeFromGameChanges();
+  const filter = `game_id=eq.${gameId}`;
+  _realtimeChannel = sb
+    .channel(`game-rt-${gameId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'buy_ins',      filter }, _onRemoteGameChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'clearouts',    filter }, _onRemoteGameChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sponsorships', filter }, _onRemoteGameChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'game_activity',filter }, _onRemoteGameChange)
+    .subscribe();
+}
+
+function unsubscribeFromGameChanges() {
+  clearTimeout(_realtimeDebounce);
+  if (_realtimeChannel) {
+    sb.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+  }
+}
+
+function _onRemoteGameChange() {
+  clearTimeout(_realtimeDebounce);
+  _realtimeDebounce = setTimeout(async () => {
+    if (state.page !== 'page-game' || !state.game || !state.table) return;
+    await hydrateFromSupabase({ keepSelection: true, tableId: state.table.id, gameId: state.game.id });
+    renderGame();
+  }, 400);
+}
+
 async function insertActivityRemote(gameId, action, detail) {
-  if (!(APP_SUPABASE_CONFIGURED && window.sb && ME_UID)) return;
-  const { error } = await sb.from('game_activity').insert({
+  if (!(APP_SUPABASE_CONFIGURED && window.sb && ME_UID)) return null;
+  const { data, error } = await sb.from('game_activity').insert({
     game_id: gameId,
     action,
     actor_user_id: ME_UID,
     detail: detail || ''
-  });
-  if (error) console.warn('activity insert:', error.message);
+  }).select('id').single();
+  if (error) { console.warn('activity insert:', error.message); return null; }
+  return data?.id ?? null;
 }
