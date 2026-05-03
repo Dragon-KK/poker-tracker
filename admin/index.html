@@ -30,6 +30,10 @@ button{cursor:pointer;font:inherit;border-radius:var(--radius);transition:opacit
 .btn-danger:hover{background:rgba(248,81,73,.2)}
 .btn-settle{background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);color:var(--green);padding:4px 10px;font-size:12px}
 .btn-settle:hover{background:rgba(63,185,80,.2)}
+.btn-warn{background:rgba(227,179,65,.1);border:1px solid rgba(227,179,65,.3);color:var(--gold);padding:4px 10px;font-size:12px}
+.btn-warn:hover{background:rgba(227,179,65,.2)}
+.pw-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font:inherit;padding:9px 12px;outline:none;margin-bottom:16px}
+.pw-input:focus{border-color:var(--blue)}
 
 /* Connect panel */
 .conn-wrap{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 53px);padding:24px}
@@ -147,6 +151,19 @@ tbody td{padding:10px 14px;vertical-align:middle}
   </div>
 </div>
 
+<!-- Reset password modal -->
+<div class="overlay" id="pw-overlay" style="display:none">
+  <div class="confirm-card">
+    <div class="confirm-h">Reset password</div>
+    <div class="confirm-body" id="pw-msg"></div>
+    <input id="pw-input" type="text" class="pw-input" placeholder="New password (6+ chars)" autocomplete="off">
+    <div class="confirm-acts">
+      <button class="btn-ghost" onclick="resolvePw(null)">Cancel</button>
+      <button class="btn-primary" onclick="submitPw()">Reset</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -228,6 +245,7 @@ async function loadUsers() {
         <td class="mono dim">${u.id}</td>
         <td class="dim">${u.created_at.slice(0,10)}</td>
         <td><div class="td-act">
+          <button class="btn-warn" data-act="reset-pw" data-id="${u.id}" data-lbl="${x(pm[u.id] || u.email || u.id)}">Reset PW</button>
           <button class="btn-danger" data-act="del-user" data-id="${u.id}" data-lbl="${x(pm[u.id] || u.email || u.id)}">Delete</button>
         </div></td>
       </tr>`).join('')}</tbody>
@@ -240,6 +258,15 @@ async function delUser(id, lbl) {
   const { error } = await sb.auth.admin.deleteUser(id);
   if (error) { toast(error.message, 'err'); return; }
   toast('User deleted'); loadUsers();
+}
+
+async function resetUserPw(id, lbl) {
+  const pw = await askPassword(lbl);
+  if (pw === null) return;
+  if (pw.length < 6) { toast('Password must be at least 6 characters', 'err'); return; }
+  const { error } = await sb.auth.admin.updateUserById(id, { password: pw });
+  if (error) { toast(error.message, 'err'); return; }
+  toast(`Password reset for "${lbl}"`);
 }
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -395,6 +422,7 @@ document.getElementById('content').addEventListener('click', e => {
   if (!btn) return;
   const { act, id, lbl } = btn.dataset;
   if (act === 'del-user')   delUser(id, lbl);
+  if (act === 'reset-pw')   resetUserPw(id, lbl);
   if (act === 'del-table')  delTable(id, lbl);
   if (act === 'del-game')   delGame(id, lbl);
   if (act === 'del-pay')    delPayment(id, lbl);
@@ -415,6 +443,33 @@ window.resolve = function (val) {
   document.getElementById('overlay').style.display = 'none';
   if (_resolve) { _resolve(val); _resolve = null; }
 };
+
+let _resolvePw = null;
+function askPassword(lbl) {
+  return new Promise(res => {
+    _resolvePw = res;
+    document.getElementById('pw-msg').textContent = `Set a new password for "${lbl}". Share it with them privately — they can change it after signing in.`;
+    const inp = document.getElementById('pw-input');
+    inp.value = '';
+    document.getElementById('pw-overlay').style.display = 'flex';
+    setTimeout(() => inp.focus(), 0);
+  });
+}
+
+window.resolvePw = function (val) {
+  document.getElementById('pw-overlay').style.display = 'none';
+  if (_resolvePw) { _resolvePw(val); _resolvePw = null; }
+};
+
+window.submitPw = function () {
+  const v = document.getElementById('pw-input').value;
+  window.resolvePw(v || '');
+};
+
+document.getElementById('pw-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); window.submitPw(); }
+  else if (e.key === 'Escape') { e.preventDefault(); window.resolvePw(null); }
+});
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
 
