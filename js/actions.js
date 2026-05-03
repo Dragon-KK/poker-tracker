@@ -93,14 +93,14 @@ function confirmBuyin() {
     const player = state.game.players[state.modalBuyin];
 
     if (APP_SUPABASE_CONFIGURED && window.sb) {
-      const { data: buyinRow, error: e1 } = await sb.from('buy_ins').insert({
+      const { error: e1 } = await sb.from('buy_ins').insert({
         game_id: state.game.id,
         user_id: player.userId,
         amount: amt
-      }).select('id').single();
+      });
       if (e1) { showError(e1.message); return; }
-      const actId = await insertActivityRemote(state.game.id, 'Buy-in', `${player.name} · ${fmtAbs(amt)}`);
-      _pushUndo(state.game.id, { type: 'buyin', label: `Buy-in · ${player.name} · ${fmtAbs(amt)}`, buyinId: buyinRow?.id, activityId: actId });
+      await insertActivityRemote(state.game.id, 'Buy-in', `${player.name} · ${fmtAbs(amt)}`);
+      _pushUndo(state.game.id, { type: 'buyin', label: `Buy-in · ${player.name} · ${fmtAbs(amt)}`, playerUserId: player.userId });
       await hydrateFromSupabase({ keepSelection: true, tableId: state.table.id, gameId: state.game.id });
       updateGamePot();
       await persistGamePeakRemote(state.game);
@@ -157,14 +157,14 @@ function confirmClearout() {
     const detail = `${player.name} · ${Math.round(chips)} chips → ${fmtAbs(amt)}`;
 
     if (APP_SUPABASE_CONFIGURED && window.sb) {
-      const { data: clearoutRow, error } = await sb.from('clearouts').insert({
+      const { error } = await sb.from('clearouts').insert({
         game_id: g.id,
         user_id: player.userId,
         amount: amt
-      }).select('id').single();
+      });
       if (error) { showError(error.message); return; }
-      const actId = await insertActivityRemote(g.id, 'Clearout', detail);
-      _pushUndo(g.id, { type: 'clearout', label: `Clearout · ${detail}`, clearoutId: clearoutRow?.id, activityId: actId });
+      await insertActivityRemote(g.id, 'Clearout', detail);
+      _pushUndo(g.id, { type: 'clearout', label: `Clearout · ${detail}`, playerUserId: player.userId });
       await hydrateFromSupabase({ keepSelection: true, tableId: state.table.id, gameId: g.id });
       updateGamePot();
       closeModal('modal-clearout');
@@ -223,24 +223,24 @@ function confirmSponsorship() {
       const sponsor_user_id = isNameRef ? null : sponsorUserId;
       const sponsor_name = isNameRef ? by : null;
 
-      const { data: buyinRow, error: e1 } = await sb.from('buy_ins').insert({
+      const { error: e1 } = await sb.from('buy_ins').insert({
         game_id: state.game.id,
         user_id: sponsored.userId,
         amount: amt
-      }).select('id').single();
+      });
       if (e1) { showError(e1.message); return; }
 
-      const { data: sponsorRow, error: e2 } = await sb.from('sponsorships').insert({
+      const { error: e2 } = await sb.from('sponsorships').insert({
         game_id: state.game.id,
         sponsored_user_id: sponsored.userId,
         sponsor_user_id,
         sponsor_name,
         amount: amt
-      }).select('id').single();
+      });
       if (e2) { showError(e2.message); return; }
 
-      const actId = await insertActivityRemote(state.game.id, 'Sponsorship', `${sponsored.name} · ${fmtAbs(amt)} via ${by}`);
-      _pushUndo(state.game.id, { type: 'sponsorship', label: `Sponsorship · ${sponsored.name} · ${fmtAbs(amt)} via ${by}`, buyinId: buyinRow?.id, sponsorshipId: sponsorRow?.id, activityId: actId });
+      await insertActivityRemote(state.game.id, 'Sponsorship', `${sponsored.name} · ${fmtAbs(amt)} via ${by}`);
+      _pushUndo(state.game.id, { type: 'sponsorship', label: `Sponsorship · ${sponsored.name} · ${fmtAbs(amt)} via ${by}`, playerUserId: sponsored.userId });
       await hydrateFromSupabase({ keepSelection: true, tableId: state.table.id, gameId: state.game.id });
       updateGamePot();
       await persistGamePeakRemote(state.game);
@@ -600,21 +600,45 @@ function undoLastGameAction() {
     if (APP_SUPABASE_CONFIGURED && window.sb) {
       showLoading();
       try {
-        if (entry.sponsorshipId) {
-          const { error } = await sb.from('sponsorships').delete().eq('id', entry.sponsorshipId);
-          if (error) { showError(error.message); stack.push(entry); return; }
+        const gid = g.id;
+        const uid = entry.playerUserId;
+
+        // Sponsorship: remove the sponsorship row first (FK dependency), then the buyin
+        if (entry.type === 'sponsorship') {
+          const { data: sp } = await sb.from('sponsorships')
+            .select('id').eq('game_id', gid).eq('sponsored_user_id', uid)
+            .order('logged_at', { ascending: false }).limit(1).maybeSingle();
+          if (sp) {
+            const { error } = await sb.from('sponsorships').delete().eq('id', sp.id);
+            if (error) { showError(error.message); stack.push(entry); return; }
+          }
         }
-        if (entry.buyinId) {
-          const { error } = await sb.from('buy_ins').delete().eq('id', entry.buyinId);
-          if (error) { showError(error.message); stack.push(entry); return; }
+
+        if (entry.type === 'buyin' || entry.type === 'sponsorship') {
+          const { data: bi } = await sb.from('buy_ins')
+            .select('id').eq('game_id', gid).eq('user_id', uid)
+            .order('logged_at', { ascending: false }).limit(1).maybeSingle();
+          if (bi) {
+            const { error } = await sb.from('buy_ins').delete().eq('id', bi.id);
+            if (error) { showError(error.message); stack.push(entry); return; }
+          }
         }
-        if (entry.clearoutId) {
-          const { error } = await sb.from('clearouts').delete().eq('id', entry.clearoutId);
-          if (error) { showError(error.message); stack.push(entry); return; }
+
+        if (entry.type === 'clearout') {
+          const { data: co } = await sb.from('clearouts')
+            .select('id').eq('game_id', gid).eq('user_id', uid)
+            .order('logged_at', { ascending: false }).limit(1).maybeSingle();
+          if (co) {
+            const { error } = await sb.from('clearouts').delete().eq('id', co.id);
+            if (error) { showError(error.message); stack.push(entry); return; }
+          }
         }
-        if (entry.activityId) {
-          await sb.from('game_activity').delete().eq('id', entry.activityId);
-        }
+
+        // Remove the matching activity entry for this user
+        const { data: act } = await sb.from('game_activity')
+          .select('id').eq('game_id', gid).eq('actor_user_id', ME_UID)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (act) await sb.from('game_activity').delete().eq('id', act.id);
       } finally {
         hideLoading();
       }

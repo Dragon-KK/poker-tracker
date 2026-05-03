@@ -278,14 +278,18 @@ function renderActivityLog() {
     el.innerHTML = '<div class="empty-state" style="padding:14px;font-size:11px">No activity yet</div>';
     return;
   }
+  const canUndo = isAuth(state.table) && peekUndo(g.id) !== null;
   el.innerHTML = g.activity
-    .map(a =>
-      `<div class="activity-row">
-      <div class="activity-time">${escapeHtml(formatActivityTs(a.ts))}</div>
-      <div class="activity-main"><span class="activity-action">${escapeHtml(a.action)}</span>${a.detail ? ` · ${escapeHtml(a.detail)}` : ''}</div>
-      <div class="activity-actor">${escapeHtml(a.actor)}</div>
-    </div>`
-    )
+    .map((a, i) => {
+      const rightCol = i === 0 && canUndo
+        ? `<button class="undo-btn" onclick="undoLastGameAction()">Undo</button>`
+        : `<div class="activity-actor">${escapeHtml(a.actor)}</div>`;
+      return `<div class="activity-row">
+        <div class="activity-time">${escapeHtml(formatActivityTs(a.ts))}</div>
+        <div class="activity-main"><span class="activity-action">${escapeHtml(a.action)}</span>${a.detail ? ` · ${escapeHtml(a.detail)}` : ''}</div>
+        ${rightCol}
+      </div>`;
+    })
     .join('');
 }
 
@@ -361,19 +365,6 @@ function renderGame() {
     })
     .join('');
 
-
-  const undoEl = document.getElementById('game-undo-bar');
-  if (undoEl) {
-    const top = peekUndo(g.id);
-    if (canEdit && top) {
-      undoEl.innerHTML = `<div class="undo-bar">
-        <div class="undo-lbl">${escapeHtml(top.label)}</div>
-        <button class="undo-btn" onclick="undoLastGameAction()">Undo</button>
-      </div>`;
-    } else {
-      undoEl.innerHTML = '';
-    }
-  }
 
   updateGamePot();
   renderActivityLog();
