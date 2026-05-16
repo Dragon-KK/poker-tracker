@@ -1,6 +1,6 @@
 /** Edit after creating your project: Supabase Dashboard → Settings → API */
 export const SUPABASE_URL = 'https://kdkyxbjpwgrxwhxijaaq.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtka3l4Ympwd2dyeHdoeGlqYWFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTMyMzQsImV4cCI6MjA5MzI2OTIzNH0.nSsmwFfeyXcZharjhc63Cxh4ogY7elmmNrKI2h6FCkU';
+export const SUPABASE_ANON_KEY = 'sb_publishable_5X2Y4v4Q0PFYdbKibOpxSA__2Lw5nfN';
 
 export function isConfigured() {
   const urlOk =
@@ -10,7 +10,7 @@ export function isConfigured() {
 
   const keyOk =
     typeof SUPABASE_ANON_KEY === 'string' &&
-    SUPABASE_ANON_KEY.length >= 120 &&
+    SUPABASE_ANON_KEY.length >= 20 &&
     !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE_ANON_KEY');
 
   return !!(urlOk && keyOk);
